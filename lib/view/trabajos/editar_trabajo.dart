@@ -151,6 +151,18 @@ class _EditarTrabajoFormState extends State<EditarTrabajoForm> {
   }
 
   @override
+  void dispose() {
+    _nombre.dispose();
+    _rtn.dispose();
+    _motor.dispose();
+    _telefono.dispose();
+    for (final controller in _campos.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F3),

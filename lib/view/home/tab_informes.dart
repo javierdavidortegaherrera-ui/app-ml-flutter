@@ -14,6 +14,11 @@ class TabInformes extends StatelessWidget {
       body: StreamBuilder<List<Trabajos>>(
         stream: TrabajoController().streamTrabajos(),
         builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text('No se pudieron cargar los informes'),
+            );
+          }
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
           }

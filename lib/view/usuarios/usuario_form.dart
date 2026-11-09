@@ -3,6 +3,7 @@ import 'package:avance2/models/usuario.dart';
 import 'package:avance2/screens/register_screen.dart';
 import 'package:avance2/services/storage_service.dart';
 import 'package:avance2/models/user_face_model.dart';
+
 import 'dart:io';
 
 class UsuarioForm extends StatefulWidget {
@@ -53,7 +54,7 @@ class _UsuarioFormState extends State<UsuarioForm> {
     }
   }
 
-    Future<void> _guardar() async {
+  Future<void> _guardar() async {
     if (_formKey.currentState!.validate()) {
       final nuevo = Usuario(
         id: _id.text.trim(),
@@ -68,7 +69,6 @@ class _UsuarioFormState extends State<UsuarioForm> {
       if (_rostroEmbedding != null) {
         await _storageService.saveUserFace(
           UserFaceModel(
-            
             name: nuevoNombre,
             embedding: _rostroEmbedding!,
             imagePath: _rostroPath,
@@ -91,6 +91,7 @@ class _UsuarioFormState extends State<UsuarioForm> {
         await _storageService.removeUserFace(antiguoNombre);
       }
 
+      if (!mounted) return;
       Navigator.pop(context);
     }
   }
@@ -102,20 +103,28 @@ class _UsuarioFormState extends State<UsuarioForm> {
     final path = await Navigator.push<String>(
       context,
       MaterialPageRoute(
-        builder: (_) => RegisterScreen(
-          id: _id.text.trim(),
-          nombre: _nombre.text.trim(),
-        ),
+        builder: (_) =>
+            RegisterScreen(id: _id.text.trim(), nombre: _nombre.text.trim()),
       ),
     );
     if (mounted && path != null) {
       final face = await _storageService.getUserFace(_nombre.text.trim());
+      if (!mounted) return;
       setState(() {
         _rostroRegistrado = true;
         _rostroPath = path;
         _rostroEmbedding = face?.embedding;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _id.dispose();
+    _nombre.dispose();
+    _correo.dispose();
+    _rol.dispose();
+    super.dispose();
   }
 
   @override

@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arquitectura interactiva · app-ml-flutter</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #0b1020; color: #eff4ff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    header { padding: 28px clamp(18px, 4vw, 52px) 19px; border-bottom: 1px solid #27334e; background: linear-gradient(115deg, #142345, #0b1020 60%); }
+    h1 { margin: 0 0 8px; font-size: clamp(1.5rem, 3vw, 2.25rem); letter-spacing: -.03em; }
+    header p { margin: 0; color: #bac9e5; max-width: 80ch; line-height: 1.55; }
+    .toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 16px clamp(18px, 4vw, 52px); }
+    .toolbar label { color: #bac9e5; font-weight: 650; }
+    button, select { background: #1b2b4d; color: #eff4ff; border: 1px solid #3a507a; border-radius: 9px; padding: 9px 12px; font: inherit; cursor: pointer; }
+    button:hover, select:hover, button:focus-visible, select:focus-visible { border-color: #80b6ff; outline: 2px solid transparent; background: #263b64; }
+    button:focus-visible, select:focus-visible, a:focus-visible { outline: 2px solid #8bc4ff; outline-offset: 2px; }
+    .spacer { flex: 1; }
+    .workspace { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; padding: 0 clamp(18px, 4vw, 52px) 22px; }
+    .canvas { position: relative; min-width: 0; min-height: 600px; overflow: hidden; border-radius: 15px; background: #0e1930; border: 1px solid #2a3b5a; }
+    svg { width: 100%; height: 100%; min-height: 600px; display: block; cursor: grab; touch-action: none; }
+    svg.dragging { cursor: grabbing; }
+    .canvas-note { position: absolute; left: 16px; bottom: 12px; padding: 7px 10px; border-radius: 7px; background: #0b1020d9; color: #aebfdb; font-size: .83rem; pointer-events: none; }
+    .edge { fill: none; stroke: #567094; stroke-width: 2; opacity: .72; marker-end: url(#arrow); transition: opacity .15s, stroke .15s; }
+    .edge.dim { opacity: .09; }
+    .edge.active { stroke: #80d6ff; stroke-width: 3; opacity: 1; }
+    .node { cursor: pointer; transition: opacity .15s; }
+    .node.dim { opacity: .24; }
+    .node rect { fill: #18294a; stroke: #45628d; stroke-width: 1.7; rx: 11; }
+    .node[data-kind="ui"] rect { fill: #133b49; stroke: #3c8d9c; }
+    .node[data-kind="logic"] rect { fill: #392852; stroke: #8a6aac; }
+    .node[data-kind="data"] rect { fill: #493321; stroke: #a98350; }
+    .node.selected rect { stroke: #f5ca6c; stroke-width: 3.5; }
+    .node:focus-visible rect { stroke: #f5ca6c; stroke-width: 3.5; }
+    .node text { fill: #f3f7ff; font-size: 16px; font-weight: 690; pointer-events: none; }
+    .node .sub { fill: #c4d0e4; font-size: 12px; font-weight: 450; }
+    aside { border-radius: 15px; border: 1px solid #2a3b5a; background: #111d35; padding: 22px; align-self: start; min-height: 340px; }
+    aside .kicker { color: #8fc5ff; text-transform: uppercase; letter-spacing: .12em; font-size: .75rem; font-weight: 750; }
+    aside h2 { font-size: 1.3rem; margin: 8px 0 11px; }
+    aside p { color: #ccdaed; line-height: 1.55; }
+    aside ul { padding-left: 20px; line-height: 1.6; color: #ccdaed; }
+    aside a, footer a { color: #a3d7ff; }
+    .notice { margin: 0 clamp(18px, 4vw, 52px) 26px; padding: 15px 18px; border: 1px solid #645131; background: #30261b; color: #f5deb5; border-radius: 10px; line-height: 1.5; }
+    footer { padding: 0 clamp(18px, 4vw, 52px) 30px; color: #b4c2db; font-size: .9rem; }
+    @media (max-width: 860px) { .workspace { grid-template-columns: 1fr; } .canvas, svg { min-height: 470px; } aside { min-height: 0; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Arquitectura de app-ml-flutter</h1>
+    <p>Explora las pantallas del taller, sus controladores, Firestore y el flujo facial local. Selecciona un nodo para ver su responsabilidad y los archivos relacionados.</p>
+  </header>
+  <div class="toolbar">
+    <label for="area">Área</label>
+    <select id="area" aria-label="Filtrar diagrama por área">
+      <option value="all">Arquitectura completa</option>
+      <option value="trabajos">Trabajos</option>
+      <option value="facial">Reconocimiento facial</option>
+      <option value="clientes">Clientes</option>
+      <option value="informes">Informes</option>
+      <option value="parametros">Parámetros</option>
+      <option value="usuarios">Usuarios</option>
+      <option value="acceso">Acceso</option>
+    </select>
+    <span class="spacer"></span>
+    <button id="zoom-in" type="button" aria-label="Acercar">＋</button>
+    <button id="zoom-out" type="button" aria-label="Alejar">－</button>
+    <button id="reset" type="button">Restablecer vista</button>
+  </div>
+  <main class="workspace">
+    <div class="canvas">
+      <svg id="graph" viewBox="0 0 1300 650" role="img" aria-label="Grafo interactivo de arquitectura">
+        <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="userSpaceOnUse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7393b9"/></marker></defs>
+        <g id="edges"></g><g id="nodes"></g>
+      </svg>
+      <div class="canvas-note">Arrastra el fondo para mover · rueda para zoom · clic en un nodo para explorar</div>
+    </div>
+    <aside id="details" aria-live="polite">
+      <div class="kicker">Guía</div>
+      <h2>Selecciona un componente</h2>
+      <p>Las líneas muestran dependencias o navegación observadas en el código. Usa el filtro para seguir una función de la app.</p>
+      <p>Los nodos naranjas representan modelos, almacenamiento y recursos; morados, controladores y servicios; verdes, pantallas; azules, arranque y navegación.</p>
+    </aside>
+  </main>
+  <div class="notice"><strong>Origen del diagrama:</strong> el análisis con Noodles MCP fue rechazado por la revisión automática, que señaló el riesgo de enviar código del repositorio a un servicio externo. Este visor fue elaborado mediante lectura local de los archivos Flutter; no es una salida de Noodles. Los nodos señalan los flujos parciales.</div>
+  <footer><a href="../README.md">Volver al README</a> · Los enlaces de archivos son relativos a este repositorio. El visor no envía datos ni necesita conexión.</footer>
+  <script>
+    "use strict";
+    const NS = "http://www.w3.org/2000/svg";
+    const nodes = [
+      {id:"main", title:"Inicio", sub:"main.dart", kind:"core", x:35, y:45, detail:"Inicializa Firebase, los formatos de fecha en español y las rutas de la aplicación.", files:["lib/main.dart","lib/firebase_options.dart"]},
+      {id:"access", title:"Acceso", sub:"Splash · LoginPage", kind:"core", x:35, y:195, detail:"Splash consulta la marca local de sesión. LoginPage ofrece acceso por contraseña local y la ruta hacia LoginScreen para reconocimiento facial.", files:["lib/view/login/splash_screen.dart","lib/view/login/login_page.dart"], note:"La contraseña está en el cliente y la marca local no autentica operaciones de Firestore."},
+      {id:"home", title:"Navegación", sub:"HomeScreen", kind:"core", x:35, y:345, detail:"Presenta las pestañas de Trabajos, Informes, Parámetros y Usuarios; permite cerrar la sesión local.", files:["lib/view/home_screen.dart"]},
+      {id:"facial", title:"Acceso facial", sub:"LoginScreen", kind:"core", x:35, y:495, detail:"Captura una imagen, detecta el rostro, obtiene su embedding con MobileFaceNet y compara la distancia con una imagen de referencia incluida en assets.", files:["lib/screens/login_screen.dart"], note:"El registro de rostros de usuarios no alimenta esta comparación; usa una referencia empaquetada."},
+      {id:"jobs", title:"Trabajos", sub:"Lista · formularios · perfil", kind:"ui", x:350, y:25, detail:"Muestra trabajos, permite crear y editar importes, marcar como cotizado, consultar perfil y confirmar la eliminación.", files:["lib/view/home/tab_trabajos.dart","lib/view/trabajos/crear_trabajo.dart","lib/view/trabajos/editar_trabajo.dart","lib/view/trabajos/trabajo_perfil.dart","lib/view/trabajos/borrar_trabajo.dart"]},
+      {id:"reports", title:"Informes", sub:"Trabajos cotizados por mes", kind:"ui", x:350, y:145, detail:"Agrupa los trabajos cotizados por mes y suma el total calculado por el modelo Trabajos.", files:["lib/view/home/tab_informes.dart"]},
+      {id:"params", title:"Parámetros", sub:"Lista · formulario", kind:"ui", x:350, y:265, detail:"Consulta, crea, edita y elimina parámetros con los campos nombre y valor.", files:["lib/view/parametros/tab_parametros.dart","lib/view/parametros/parametros_form.dart"]},
+      {id:"users", title:"Usuarios", sub:"Lista · formulario", kind:"ui", x:350, y:385, detail:"Gestiona usuarios y abre la pantalla de captura facial opcional desde el formulario.", files:["lib/view/usuarios/tab_usuarios.dart","lib/view/usuarios/usuario_form.dart","lib/screens/register_screen.dart"], note:"RegisterScreen captura una foto, pero todavía no devuelve un embedding ni completa el registro facial."},
+      {id:"clients", title:"Clientes", sub:"Lista · formulario", kind:"ui", x:350, y:505, detail:"Contiene formularios y operaciones CRUD para clientes.", files:["lib/view/clientes/tab_clientes.dart","lib/view/clientes/cliente_form.dart"], note:"TabClientes no aparece en las pestañas ni en las rutas de main.dart."},
+      {id:"jobctl", title:"TrabajoController", sub:"CRUD · cotización", kind:"logic", x:665, y:25, detail:"Lee y escribe documentos de trabajos en Firestore y ofrece una secuencia de cambios.", files:["lib/controller/trabajo_controller.dart"]},
+      {id:"paramctl", title:"ParametroController", sub:"CRUD", kind:"logic", x:665, y:145, detail:"Gestiona los documentos de la colección parametros en Firestore.", files:["lib/controller/parametros_controller.dart"]},
+      {id:"userctl", title:"UsuarioController", sub:"CRUD", kind:"logic", x:665, y:265, detail:"Gestiona los documentos de la colección usuarios en Firestore.", files:["lib/controller/usuario_controller.dart"]},
+      {id:"clientctl", title:"ClienteController", sub:"CRUD · stream", kind:"logic", x:665, y:385, detail:"Gestiona los documentos de clientes en Firestore.", files:["lib/controller/cliente_controller.dart"]},
+      {id:"facesvc", title:"Servicios faciales", sub:"Cámara · recorte · TFLite", kind:"logic", x:665, y:505, detail:"CameraService captura; FaceCropService detecta y recorta con ML Kit; FaceRecognitionService genera el embedding con TFLite.", files:["lib/services/camera_service.dart","lib/services/face_crop_service.dart","lib/services/face_recognition_service.dart"]},
+      {id:"models", title:"Modelos", sub:"Trabajo · Cliente · Usuario", kind:"data", x:1000, y:45, detail:"Convierten los datos entre mapas y objetos. Trabajos calcula el total a pagar; Parametro y UserFaceModel representan datos adicionales.", files:["lib/models/trabajo.dart","lib/models/cliente.dart","lib/models/usuario.dart","lib/models/parametro.dart","lib/models/user_face_model.dart"]},
+      {id:"firestore", title:"Cloud Firestore", sub:"4 colecciones", kind:"data", x:1000, y:195, detail:"Almacena trabajos, clientes, parámetros y usuarios mediante los controladores del cliente Flutter.", files:["lib/controller/trabajo_controller.dart","lib/controller/cliente_controller.dart","lib/controller/parametros_controller.dart","lib/controller/usuario_controller.dart"]},
+      {id:"prefs", title:"SharedPreferences", sub:"Sesión · rostros locales", kind:"data", x:1000, y:345, detail:"Guarda la marca logueado y, a través de StorageService, puede guardar UserFaceModel localmente.", files:["lib/view/login/splash_screen.dart","lib/view/login/login_page.dart","lib/services/storage_service.dart"], note:"La marca de sesión y los embeddings locales no sustituyen autenticación ni almacenamiento seguro."},
+      {id:"assets", title:"Recursos faciales", sub:"MobileFaceNet · referencia", kind:"data", x:1000, y:495, detail:"Contiene el modelo TFLite y la imagen de referencia usada por LoginScreen. También hay un archivo antisuplantación que no participa en el flujo actual.", files:["pubspec.yaml"], note:"La imagen de referencia está empaquetada dentro de la aplicación."}
+    ];
+    const edges = [
+      ["main","access",["acceso"]], ["main","home",["acceso"]], ["access","home",["acceso"]], ["access","facial",["facial"]],
+      ["access","prefs",["acceso"]], ["home","prefs",["acceso"]],
+      ["home","jobs",["trabajos"]], ["home","reports",["informes"]], ["home","params",["parametros"]], ["home","users",["usuarios"]],
+      ["jobs","jobctl",["trabajos"]], ["reports","jobctl",["informes"]], ["params","paramctl",["parametros"]], ["users","userctl",["usuarios"]], ["clients","clientctl",["clientes"]],
+      ["users","facesvc",["facial","usuarios"]], ["facial","facesvc",["facial"]], ["facial","prefs",["facial"]],
+      ["jobctl","models",["trabajos","informes"]], ["paramctl","models",["parametros"]], ["userctl","models",["usuarios"]], ["clientctl","models",["clientes"]],
+      ["jobctl","firestore",["trabajos","informes"]], ["paramctl","firestore",["parametros"]], ["userctl","firestore",["usuarios"]], ["clientctl","firestore",["clientes"]],
+      ["facesvc","assets",["facial"]], ["users","prefs",["facial","usuarios"]]
+    ];
+    const byId = new Map(nodes.map(node => [node.id,node]));
+    const svg = document.getElementById("graph");
+    const edgeLayer = document.getElementById("edges");
+    const nodeLayer = document.getElementById("nodes");
+    const details = document.getElementById("details");
+    const area = document.getElementById("area");
+    const nodeElements = new Map();
+    const edgeElements = [];
+    let selected = null;
+    let box = {x:0,y:0,w:1300,h:650};
+    let drag = null;
+    function element(name, attrs) { const el=document.createElementNS(NS,name); for(const [key,value] of Object.entries(attrs)) el.setAttribute(key,value); return el; }
+    function renderBox() { svg.setAttribute("viewBox",`${box.x} ${box.y} ${box.w} ${box.h}`); }
+    for(const [from,to,tags] of edges) {
+      const a=byId.get(from), b=byId.get(to);
+      const sx=a.x+225, sy=a.y+35, ex=b.x, ey=b.y+35;
+      let path;
+      if(ex>sx) { const c=Math.max(45,(ex-sx)*.52); path=`M ${sx} ${sy} C ${sx+c} ${sy}, ${ex-c} ${ey}, ${ex-10} ${ey}`; }
+      else { const mid=Math.min(635,Math.max(sy,ey)+55); path=`M ${sx} ${sy} C ${sx+45} ${mid}, ${ex-45} ${mid}, ${ex-10} ${ey}`; }
+      const line=element("path",{d:path,class:"edge"});
+      edgeLayer.append(line); edgeElements.push({from,to,tags,el:line});
+    }
+    for(const node of nodes) {
+      const group=element("g",{class:"node",transform:`translate(${node.x} ${node.y})`,"data-kind":node.kind,tabindex:"0",role:"button","aria-label":`${node.title}: ${node.sub}`});
+      group.append(element("rect",{width:"225",height:"70"}));
+      const title=element("text",{x:"16",y:"29"}); title.textContent=node.title; group.append(title);
+      const sub=element("text",{x:"16",y:"52",class:"sub"}); sub.textContent=node.sub; group.append(sub);
+      group.addEventListener("click",()=>select(node.id));
+      group.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" "){event.preventDefault();select(node.id);}});
+      nodeLayer.append(group); nodeElements.set(node.id,group);
+    }
+    function select(id) {
+      selected=id;
+      const node=byId.get(id);
+      details.replaceChildren();
+      const kicker=document.createElement("div"); kicker.className="kicker"; kicker.textContent=node.kind==="ui"?"Pantalla":node.kind==="logic"?"Controlador":node.kind==="data"?"Datos y servicios":"Arranque y navegación";
+      const heading=document.createElement("h2"); heading.textContent=node.title;
+      const body=document.createElement("p"); body.textContent=node.detail;
+      details.append(kicker,heading,body);
+      if(node.note) { const note=document.createElement("p"); note.textContent=`Estado actual: ${node.note}`; details.append(note); }
+      const label=document.createElement("strong"); label.textContent="Archivos"; details.append(label);
+      const list=document.createElement("ul");
+      for(const file of node.files) { const item=document.createElement("li"), link=document.createElement("a"); link.href="../"+file; link.textContent=file; item.append(link); list.append(item); }
+      details.append(list);
+      refresh();
+    }
+    function refresh() {
+      const filter=area.value;
+      const visibleEdges=edgeElements.filter(e=>filter==="all"||e.tags.includes(filter));
+      const visibleNodes=new Set(filter==="all"?nodes.map(n=>n.id):visibleEdges.flatMap(e=>[e.from,e.to]));
+      const neighbors=new Set(selected?[selected]:[]);
+      if(selected) for(const edge of visibleEdges) if(edge.from===selected||edge.to===selected) { neighbors.add(edge.from); neighbors.add(edge.to); }
+      for(const [id,el] of nodeElements) { el.style.display=visibleNodes.has(id)?"":"none"; el.classList.toggle("selected",id===selected); el.classList.toggle("dim",!!selected&&!neighbors.has(id)); }
+      for(const edge of edgeElements) { const visible=filter==="all"||edge.tags.includes(filter); edge.el.style.display=visible?"":"none"; edge.el.classList.toggle("dim",!!selected&&edge.from!==selected&&edge.to!==selected); edge.el.classList.toggle("active",!!selected&&(edge.from===selected||edge.to===selected)); }
+    }
+    area.addEventListener("change",()=>{ selected=null; refresh(); });
+    function zoom(factor, px=.5, py=.5) { const nw=Math.max(430,Math.min(2200,box.w*factor)); const nh=nw/2; box.x+=box.w*px-nw*px; box.y+=box.h*py-nh*py; box.w=nw; box.h=nh; renderBox(); }
+    document.getElementById("zoom-in").addEventListener("click",()=>zoom(.8));
+    document.getElementById("zoom-out").addEventListener("click",()=>zoom(1.25));
+    document.getElementById("reset").addEventListener("click",()=>{box={x:0,y:0,w:1300,h:650};renderBox();});
+    svg.addEventListener("wheel",event=>{event.preventDefault();const rect=svg.getBoundingClientRect();zoom(event.deltaY>0?1.12:.89,(event.clientX-rect.left)/rect.width,(event.clientY-rect.top)/rect.height);},{passive:false});
+    svg.addEventListener("pointerdown",event=>{if(event.target.closest(".node"))return;drag={x:event.clientX,y:event.clientY,boxX:box.x,boxY:box.y};svg.classList.add("dragging");svg.setPointerCapture(event.pointerId);});
+    svg.addEventListener("pointermove",event=>{if(!drag)return;const rect=svg.getBoundingClientRect();box.x=drag.boxX-(event.clientX-drag.x)*box.w/rect.width;box.y=drag.boxY-(event.clientY-drag.y)*box.h/rect.height;renderBox();});
+    function stopDrag(){drag=null;svg.classList.remove("dragging");}
+    svg.addEventListener("pointerup",stopDrag); svg.addEventListener("pointercancel",stopDrag);
+    refresh();
+  </script>
+</body>
+</html>

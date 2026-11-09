@@ -38,6 +38,13 @@ class _ParametroFormState extends State<ParametroForm> {
     }
   }
 
+  @override
+  void dispose() {
+    _nombre.dispose();
+    _valor.dispose();
+    super.dispose();
+  }
+
   Widget _campoTexto(
     String label,
     TextEditingController controller, {

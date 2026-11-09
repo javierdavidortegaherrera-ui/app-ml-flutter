@@ -1,8 +1,9 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:image/image.dart' as img;
+
 import 'dart:math' as math;
+
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -20,11 +21,13 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _cameraService = CameraService();
-  final recog.FaceRecognitionService _faceService = recog.FaceRecognitionService();
+  final recog.FaceRecognitionService _faceService =
+      recog.FaceRecognitionService();
   final crop.FaceCropService _faceCropService = crop.FaceCropService();
 
   bool _isInitialized = false;
   bool _isProcessing = false;
+  String? _initializationError;
   String? _loginResult;
   List<List<double>>? _validEmbeddings; // Referencias del rostro
 
@@ -36,78 +39,78 @@ class _LoginScreenState extends State<LoginScreen> {
 
   /// Inicializa cámara y modelo
   Future<void> _initialize() async {
-    final success = await _cameraService.initializeCamera();
-    if (!success) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo iniciar la cámara')),
-        );
+    setState(() => _initializationError = null);
+    try {
+      final success = await _cameraService.initializeCamera();
+      if (!success) {
+        if (mounted) {
+          setState(() => _initializationError = 'No se pudo iniciar la cámara');
+        }
+        return;
       }
-      return;
+      await _faceService.loadModel();
+      await _loadReferenceEmbeddings();
+      if (!mounted) return;
+      setState(() => _isInitialized = true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _initializationError =
+            'No se pudo preparar el reconocimiento facial',
+      );
+      debugPrint('Error al inicializar el reconocimiento facial: $error');
     }
-
-    await _faceService.loadModel();
-    await _loadReferenceEmbeddings();
-    setState(() => _isInitialized = true);
   }
 
- /// Carga un embedding único desde la imagen de referencia
-Future<void> _loadReferenceEmbeddings() async {
-  final byteData = await rootBundle.load('assets/tflite/face.jpg');
-  final imageBytes = byteData.buffer.asUint8List();
-  final image = img.decodeImage(imageBytes);
-  if (image != null) {
+  /// Carga un embedding único desde la imagen de referencia
+  Future<void> _loadReferenceEmbeddings() async {
+    final byteData = await rootBundle.load('assets/tflite/face.jpg');
+    final imageBytes = byteData.buffer.asUint8List();
+    final image = img.decodeImage(imageBytes);
+    if (image == null) {
+      throw StateError('No se pudo leer la imagen de referencia');
+    }
     final embedding = await _faceService.predict(image);
-    _validEmbeddings = [embedding]; // Lo envolvemos en una lista para mantener compatibilidad
+    _validEmbeddings = [embedding];
   }
-}
-
 
   /// Reconocimiento facial con recorte y comparación
   Future<void> _authenticateUser() async {
-    if (_validEmbeddings == null) return;
+    if (_validEmbeddings == null || _isProcessing) return;
 
     setState(() {
       _isProcessing = true;
       _loginResult = null;
     });
 
-    final XFile? file = await _cameraService.takePicture();
-    if (file == null) {
-      setState(() => _isProcessing = false);
-      return;
-    }
+    try {
+      final XFile? file = await _cameraService.takePicture();
+      if (!mounted || file == null) return;
 
-    final croppedImage = await _faceCropService.detectAndCropFace(file.path);
-    if (croppedImage == null) {
-      setState(() {
-        _isProcessing = false;
-        _loginResult = 'Rostro no detectado. Intenta de nuevo.';
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se detectó ningún rostro.'),
-          backgroundColor: Colors.orange,
-        ),
+      final croppedImage = await _faceCropService.detectAndCropFace(file.path);
+      if (!mounted) return;
+      if (croppedImage == null) {
+        setState(() => _loginResult = 'Rostro no detectado. Intenta de nuevo.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se detectó ningún rostro.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      final inputEmbedding = await _faceService.predict(croppedImage);
+      if (!mounted) return;
+      final match = _validEmbeddings!.any(
+        (ref) => _compareEmbeddings(ref, inputEmbedding) < 0.45,
       );
-      return;
-    }
 
-    final inputEmbedding = await _faceService.predict(croppedImage);
-    final match = _validEmbeddings!.any(
-      (ref) => _compareEmbeddings(ref, inputEmbedding) < 0.45,
-    );
-
-    if (match) {
-      setState(() {
-        _loginResult = 'Acceso concedido';
-        _isProcessing = false;
-      });
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('logueado', true);
-
-      if (mounted) {
+      if (match) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('logueado', true);
+        if (!mounted) return;
+        setState(() => _loginResult = 'Acceso concedido');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Bienvenido. Rostro verificado con éxito.'),
@@ -115,14 +118,8 @@ Future<void> _loadReferenceEmbeddings() async {
           ),
         );
         Navigator.pushReplacementNamed(context, '/bienvenida');
-      }
-    } else {
-      setState(() {
-        _loginResult = 'Acceso denegado. Rostro no autorizado.';
-        _isProcessing = false;
-      });
-
-      if (mounted) {
+      } else {
+        setState(() => _loginResult = 'Acceso denegado. Rostro no autorizado.');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Acceso denegado. Intenta de nuevo.'),
@@ -130,6 +127,14 @@ Future<void> _loadReferenceEmbeddings() async {
           ),
         );
       }
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _loginResult = 'No se pudo procesar el rostro. Intenta de nuevo.',
+      );
+      debugPrint('Error al autenticar el rostro: $error');
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
@@ -153,8 +158,23 @@ Future<void> _loadReferenceEmbeddings() async {
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        appBar: AppBar(title: const Text('Login facial')),
+        body: Center(
+          child: _initializationError == null
+              ? const CircularProgressIndicator()
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(_initializationError!),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _initialize,
+                      child: const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+        ),
       );
     }
 

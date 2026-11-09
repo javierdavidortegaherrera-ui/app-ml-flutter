@@ -132,6 +132,18 @@ class _CrearTrabajoFormState extends State<CrearTrabajoForm> {
   }
 
   @override
+  void dispose() {
+    _nombre.dispose();
+    _rtn.dispose();
+    _telefono.dispose();
+    _motor.dispose();
+    for (final controller in campos.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F3F3),

@@ -13,26 +13,18 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
   final usuarioController = TextEditingController();
   final passController = TextEditingController();
   bool _mostrarPassword = false;
-  bool _hasFaceData = false;
 
-  @override 
+  @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _checkFaceData();
-  }
-
-  Future<void> _checkFaceData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final faceList = prefs.getStringList('user_faces') ?? [];
-    setState(() {
-      _hasFaceData = faceList.isNotEmpty;
-    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    usuarioController.dispose();
+    passController.dispose();
     super.dispose();
   }
 
@@ -52,6 +44,7 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
     if (usuario == 'admin123' && contrasena == 'Aguileta123') {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('logueado', true);
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, '/bienvenida');
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -144,7 +137,6 @@ class _LoginPageState extends State<LoginPage> with WidgetsBindingObserver {
                 child: const Text('Iniciar Sesión'),
               ),
               const SizedBox(height: 10),
-
 
               TextButton(
                 onPressed: () {

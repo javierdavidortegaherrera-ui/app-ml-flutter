@@ -48,6 +48,15 @@ class _ClienteFormState extends State<ClienteForm> {
     }
   }
 
+  @override
+  void dispose() {
+    _nombre.dispose();
+    _rtn.dispose();
+    _telefono.dispose();
+    _tipoMotor.dispose();
+    super.dispose();
+  }
+
   Widget _campoTexto(
     String label,
     TextEditingController controller, {

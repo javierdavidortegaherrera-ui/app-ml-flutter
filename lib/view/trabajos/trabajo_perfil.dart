@@ -72,6 +72,7 @@ class _PerfilState extends State<Perfil> {
     if (await canLaunchUrl(url)) {
       await launchUrl(url, mode: LaunchMode.externalApplication);
     } else {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudo abrir WhatsApp')),
       );
@@ -184,6 +185,7 @@ class _PerfilState extends State<Perfil> {
 
               if (resultado != null && resultado is Trabajos) {
                 await TrabajoController().actualizarTrabajo(resultado);
+                if (!mounted) return;
                 setState(() {
                   _modelo = resultado;
                 });

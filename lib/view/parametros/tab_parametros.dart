@@ -21,6 +21,7 @@ class _TabParametrosState extends State<TabParametros> {
 
   void _cargarParametros() async {
     final lista = await ParametroController().obtenerParametros();
+    if (!mounted) return;
     setState(() => _parametros = lista);
   }
 

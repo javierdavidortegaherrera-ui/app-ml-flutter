@@ -1,38 +1,64 @@
 import 'dart:typed_data';
+
 import 'package:tflite_flutter/tflite_flutter.dart';
 import 'package:image/image.dart' as img;
 
 class FaceRecognitionService {
-  late Interpreter _interpreter;
+  Interpreter? _interpreter;
+  bool _disposed = false;
 
-  /// tamaño de entrada que requiere el modelo 
+  /// tamaño de entrada que requiere el modelo
   static const int modelInputSize = 112;
 
   /// Carga el modelo MobileFaceNet desde el assets
   Future<void> loadModel() async {
-    _interpreter = await Interpreter.fromAsset('assets/tflite/mobilefacenet.tflite');
+    final interpreter = await Interpreter.fromAsset(
+      'assets/tflite/mobilefacenet.tflite',
+    );
+    if (_disposed) {
+      interpreter.close();
+      return;
+    }
+    _interpreter?.close();
+    _interpreter = interpreter;
   }
 
   /// Realiza la predicción del embedding facial
   Future<List<double>> predict(img.Image faceImage) async {
     // Redimensiona la imagen al tamaño que requiere el modelo
-    final resized = img.copyResize(faceImage, width: modelInputSize, height: modelInputSize);
+    final resized = img.copyResize(
+      faceImage,
+      width: modelInputSize,
+      height: modelInputSize,
+    );
 
     // Convierte imagen a Float32List
     final Float32List input = imageToFloat32(resized);
 
     // Prepara la salida (192 dimensiones)
-    final List<List<double>> output = List.generate(1, (_) => List.filled(192, 0.0));
+    final List<List<double>> output = List.generate(
+      1,
+      (_) => List.filled(192, 0.0),
+    );
 
     // Ejecuta el modelo con reshape correcto
-    _interpreter.run(input.reshape([1, modelInputSize, modelInputSize, 3]), output);
+    final interpreter = _interpreter;
+    if (interpreter == null) {
+      throw StateError('El modelo facial aún no está cargado');
+    }
+    interpreter.run(
+      input.reshape([1, modelInputSize, modelInputSize, 3]),
+      output,
+    );
 
     return output[0];
   }
 
   /// Convierte imagen a Float32List [-1, 1] según MobileFaceNet
   Float32List imageToFloat32(img.Image image) {
-    final Float32List convertedBytes = Float32List(modelInputSize * modelInputSize * 3);
+    final Float32List convertedBytes = Float32List(
+      modelInputSize * modelInputSize * 3,
+    );
     int pixelIndex = 0;
 
     for (int y = 0; y < modelInputSize; y++) {
@@ -48,6 +74,8 @@ class FaceRecognitionService {
   }
 
   void dispose() {
-    _interpreter.close();
+    _disposed = true;
+    _interpreter?.close();
+    _interpreter = null;
   }
 }

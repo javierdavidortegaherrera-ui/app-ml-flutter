@@ -21,6 +21,7 @@ class _TrabajoListaScreenState extends State<TrabajoListaScreen> {
 
   void _cargarTrabajos() async {
     final trabajos = await TrabajoController().obtenerTrabajos();
+    if (!mounted) return;
     setState(() => _trabajos = trabajos);
   }
 

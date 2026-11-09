@@ -21,6 +21,7 @@ class _TabUsuariosState extends State<TabUsuarios> {
 
   void _cargarUsuarios() async {
     final usuarios = await UsuarioController().obtenerUsuarios();
+    if (!mounted) return;
     setState(() => _usuarios = usuarios);
   }
 

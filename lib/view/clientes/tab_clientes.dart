@@ -21,6 +21,7 @@ class _TabClientesState extends State<TabClientes> {
 
   void _cargarClientes() async {
     final clientes = await ClienteController().obtenerClientes();
+    if (!mounted) return;
     setState(() => _clientes = clientes);
   }
 

@@ -18,6 +18,7 @@ class _SplashScreenState extends State<SplashScreen> {
   void verificarSesion() async {
     final prefs = await SharedPreferences.getInstance();
     final logueado = prefs.getBool('logueado') ?? false;
+    if (!mounted) return;
 
     if (logueado) {
       Navigator.pushReplacementNamed(context, '/bienvenida');
